@@ -1,0 +1,61 @@
+version: '3.9'
+
+services:
+  web:
+    build: .
+    command: gunicorn conversion.wsgi:application --bind 0.0.0.0:8000 --workers 4
+    environment:
+      - DJANGO_SETTINGS_MODULE=conversion.settings.production
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/mydb
+      - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672//
+      - CELERY_RESULT_BACKEND=rpc://
+    ports:
+      - "80:8000"
+    volumes:
+      - static_volume:/app/static
+      - media_volume:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+
+  celery:
+    build: .
+    command: celery -A conversion worker --loglevel=info
+    environment:
+      - DJANGO_SETTINGS_MODULE=conversion.settings.production
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/mydb
+      - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672//
+      - CELERY_RESULT_BACKEND=rpc://
+    volumes:
+      - static_volume:/app/static
+      - media_volume:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: mydb
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      retries: 5
+
+volumes:
+  static_volume:/app/static
+  media_volume:/app/media
