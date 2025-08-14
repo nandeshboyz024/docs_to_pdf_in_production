@@ -15,7 +15,11 @@ RUN pip install -r requirements.txt
 # Copy project files
 COPY . .
 
+# Copy startup script
+COPY start.sh /start.sh
+RUN chmod +x /start.sh
+
 EXPOSE 8000
 
-# Instead of runserver, use gunicorn for production
-CMD ["gunicorn", "conversion.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "4"]
+# Run both Celery worker and Django in the same container
+CMD ["/start.sh"]
